@@ -1,5 +1,7 @@
-# Environment Variables & Secrets
+# Environment Variables
 .env
+
+# Secrets Variables
 .key
 
 # Python Bytecode & Cache
@@ -7,3 +9,6 @@ __pycache__/
 
 # IDE Files
 *.ipynb_checkpoints/
+
+# LLM Framework
+.langgraph_api
