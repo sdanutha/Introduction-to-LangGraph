@@ -1,87 +1,75 @@
 
-from typing import Literal
-from langchain_core.tools import tool
 from langchain_ollama import ChatOllama
-from langgraph.prebuilt import ToolNode
-from langchain.schema.runnable.config import RunnableConfig
-from langchain_core.messages import HumanMessage
+from langchain_core.messages import SystemMessage, HumanMessage
+from langgraph.graph import START, StateGraph, MessagesState
+from langgraph.prebuilt import ToolNode, tools_condition
 
 import chainlit as cl
 
-@tool
-def get_weather(city: Literal["nyc", "sf"]):
-    """Use this to get weather information."""
-    if city == "nyc":
-        return "It might be cloudy in nyc"
-    elif city == "sf":
-        return "It's always sunny in sf"
-    else:
-        raise AssertionError("Unknown city")
+# Tool
+def add(a: int, b: int) -> int:
+    """Adds a and b.
+    
+    Args:
+        a: first int
+        b: second int
+    """
+    return a + b
 
-tools = [get_weather]
-model = ChatOllama(model="llama3.2:1b", temperature=0)
-final_model = ChatOllama(model="deepseek-r1:1.5b", temperature=0)
+def multiply(a: int, b: int) -> int:
+    """Multiplies a and b.
+    
+    Args:
+        a: first int
+        b: second int
+    """
+    return a * b
 
-model = model.bind_tools(tools)
-final_model = final_model.with_config(tags=["final_node"])
-tool_node = ToolNode(tools=tools)
+def divide(a: int, b: int) -> float:
+    """Divide a and b.
+    
+    Args:
+        a: first int
+        b: second int
+    """
+    return a / b
 
-from langgraph.graph import END, StateGraph, START
-from langgraph.graph.message import MessagesState
-from langchain_core.messages import SystemMessage, HumanMessage
+tools = [add, multiply, divide]
 
-def should_continue(state: MessagesState) -> Literal["tools", "final"]:
-    messages = state["messages"]
-    last_message = messages[-1]
-    # If the LLM makes a tool call, then we route to the "tools" node
-    if last_message.tool_calls:
-        return "tools"
-    # Otherwise, we stop (reply to the user)
-    return "final"
+# LLM with bound tool
+llm = ChatOllama(model="llama3.2:1b")
+llm_with_tools = llm.bind_tools(tools)
 
-def call_model(state: MessagesState):
-    messages = state["messages"]
-    response = model.invoke(messages)
-    # We return a list, because this will get added to the existing list
-    return {"messages": [response]}
+# Node
+def assistant(state: MessagesState):
+    return {"messages": [llm_with_tools.invoke([system_message] + state["messages"])]}
 
-def call_final_model(state: MessagesState):
-    messages = state["messages"]
-    last_ai_message = messages[-1]
-    response = final_model.invoke(
-        [
-            SystemMessage("Rewrite this in the voice of Al Roker"),
-            HumanMessage(last_ai_message.content),
-        ]
-    )
-    # overwrite the last AI message from the agent
-    response.id = last_ai_message.id
-    return {"messages": [response]}
+# System Message
+system_message = SystemMessage(
+    content="You are a helpful assistant tasked with performing arithmetic on a set of inputs."
+)
 
+# Graph
 builder = StateGraph(MessagesState)
 
-builder.add_node("agent", call_model)
-builder.add_node("tools", tool_node)
-builder.add_node("final", call_final_model)
-builder.add_edge(START, "agent")
-builder.add_conditional_edges("agent", should_continue)
-builder.add_edge("tools", "agent")
-builder.add_edge("final", END)
+builder.add_node("assistant", assistant)
+builder.add_node("tools", ToolNode(tools))
+
+builder.add_edge(START, "assistant")
+builder.add_conditional_edges("assistant", tools_condition)
+builder.add_edge("tools", "assistant")
 
 graph = builder.compile()
 
 @cl.on_message
-async def on_message(msg: cl.Message):
-    config = {"configurable": {"thread_id": cl.context.session.id}}
-    cb = cl.LangchainCallbackHandler()
-    final_answer = cl.Message(content="")
+async def run_convo(message: cl.Message):
     
-    for msg, metadata in graph.stream({"messages": [HumanMessage(content=msg.content)]}, stream_mode="messages", config=RunnableConfig(callbacks=[cb], **config)):
-        if (
-            msg.content
-            and not isinstance(msg, HumanMessage)
-            and metadata["langgraph_node"] == "final"
-        ):
-            await final_answer.stream_token(msg.content)
-
-    await final_answer.send()
+    # Create the initial conversation state with the user's message.
+    state = {"messages": [HumanMessage(content=message.content)]}
+    
+    # Invoke the compiled workflow.
+    result = graph.invoke(state)
+    
+    # Extract and send the final message content from the result.
+    final_response = result["messages"][-1].content
+    await cl.Message(content=final_response).send()
