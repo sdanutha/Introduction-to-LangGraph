@@ -20,3 +20,4 @@ trustcall
 
 # CLI tool for LangGraph
 langgraph-cli
+langgraph-cli[inmem]
