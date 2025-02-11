@@ -1,9 +1,6 @@
 # Environment Variables
 .env
 
-# Secrets Variables
-.key
-
 # Python Bytecode & Cache
 __pycache__/
 
