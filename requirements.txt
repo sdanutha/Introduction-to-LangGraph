@@ -1,23 +1,24 @@
-# LLM framework & UI
+# chainlit
 chainlit
 
-# Core LangGraph components
-langgraph
-langgraph-sdk
-langgraph-checkpoint-sqlite
-
-# LangChain ecosystem
-langsmith
+# LangChain
+langchain
 langchain-community
 langchain-core
 langchain-openai
 langchain-ollama
 
-# Supporting utilities
+# LangGraph
+langgraph
+langgraph-sdk
+langgraph-checkpoint-sqlite
+langgraph-cli
+langgraph-cli[inmem]
+
+# LangSmith
+langsmith
+
+# Utilities
 tavily-python
 wikipedia
 trustcall
-
-# CLI tool for LangGraph
-langgraph-cli
-langgraph-cli[inmem]
