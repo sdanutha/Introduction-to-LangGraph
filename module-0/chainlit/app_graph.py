@@ -1,10 +1,8 @@
 
 from langchain_ollama import ChatOllama
-from langchain_core.messages import SystemMessage, HumanMessage
+from langchain_core.messages import SystemMessage
 from langgraph.graph import START, StateGraph, MessagesState
 from langgraph.prebuilt import ToolNode, tools_condition
-
-import chainlit as cl
 
 # Tool
 def add(a: int, b: int) -> int:
@@ -60,16 +58,3 @@ builder.add_conditional_edges("assistant", tools_condition)
 builder.add_edge("tools", "assistant")
 
 graph = builder.compile()
-
-@cl.on_message
-async def run_convo(message: cl.Message):
-    
-    # Create the initial conversation state with the user's message.
-    state = {"messages": [HumanMessage(content=message.content)]}
-    
-    # Invoke the compiled workflow.
-    result = graph.invoke(state)
-    
-    # Extract and send the final message content from the result.
-    final_response = result["messages"][-1].content
-    await cl.Message(content=final_response).send()

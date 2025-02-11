@@ -1,0 +1,6 @@
+{
+  "graphs": {
+    "app_graph" : "./app_graph.py:graph"
+  },
+  "dependencies": ["."]
+}
